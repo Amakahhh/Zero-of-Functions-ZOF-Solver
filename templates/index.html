@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZOF Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <main class="layout">
+        <header class="hero">
+            <div class="hero-icon" aria-hidden="true">
+                <i data-lucide="activity"></i>
+            </div>
+            <div>
+                <h1>Zero of Functions (ZOF) Solver</h1>
+                <p>Experiment with six classic numerical methods for locating roots of nonlinear equations.</p>
+            </div>
+        </header>
+
+        {% if error_message %}
+        <div class="alert alert-error">
+            {{ error_message }}
+        </div>
+        {% endif %}
+
+        <section class="card">
+            <h2>Enter Problem Details</h2>
+            <form method="POST" id="zof-form">
+                <div class="form-group">
+                    <label for="method">Method</label>
+                    <select id="method" name="method">
+                        {% for key, label in methods.items() %}
+                        <option value="{{ key }}" {% if selected_method==key %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="function_expr">f(x)</label>
+                    <input type="text" id="function_expr" name="function_expr"
+                        value="{{ function_expr or defaults.function_expr }}" placeholder="e.g. x**3 - x - 2" required />
+                    <small>Use the variable x. Example: x**3 - 5*x + 1 or sin(x) - x/2.</small>
+                </div>
+
+                <div class="form-group method-fields" data-methods="fixed_point">
+                    <label for="g_expr">g(x) for Fixed Point</label>
+                    <input type="text" id="g_expr" name="g_expr" value="{{ g_expr or defaults.g_expr }}"
+                        placeholder="e.g. cos(x)" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group method-fields" data-methods="bisection regula_falsi">
+                        <label for="lower">Lower bound (a)</label>
+                        <input type="number" step="any" id="lower" name="lower"
+                            value="{{ request.form.get('lower', defaults.lower) }}" />
+                    </div>
+                    <div class="form-group method-fields" data-methods="bisection regula_falsi">
+                        <label for="upper">Upper bound (b)</label>
+                        <input type="number" step="any" id="upper" name="upper"
+                            value="{{ request.form.get('upper', defaults.upper) }}" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group method-fields" data-methods="secant">
+                        <label for="x0">x₀</label>
+                        <input type="number" step="any" id="x0" name="x0"
+                            value="{{ request.form.get('x0', defaults.x0) }}" />
+                    </div>
+                    <div class="form-group method-fields" data-methods="secant">
+                        <label for="x1">x₁</label>
+                        <input type="number" step="any" id="x1" name="x1"
+                            value="{{ request.form.get('x1', defaults.x1) }}" />
+                    </div>
+                </div>
+
+                <div class="form-group method-fields" data-methods="newton_raphson fixed_point modified_secant">
+                    <label for="initial_guess">Initial guess</label>
+                    <input type="number" step="any" id="initial_guess" name="initial_guess"
+                        value="{{ request.form.get('initial_guess', defaults.initial_guess) }}" />
+                </div>
+
+                <div class="form-group method-fields" data-methods="modified_secant">
+                    <label for="delta">Perturbation δ</label>
+                    <input type="number" step="any" id="delta" name="delta"
+                        value="{{ request.form.get('delta', defaults.delta) }}" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tolerance">Tolerance</label>
+                        <input type="text" id="tolerance" name="tolerance"
+                            value="{{ request.form.get('tolerance', defaults.tolerance) }}" />
+                    </div>
+                    <div class="form-group">
+                        <label for="max_iterations">Max iterations</label>
+                        <input type="number" id="max_iterations" name="max_iterations" min="1"
+                            value="{{ request.form.get('max_iterations', defaults.max_iterations) }}" />
+                    </div>
+                </div>
+
+                <button type="submit" class="btn">
+                    <i data-lucide="play"></i>
+                    Run Method
+                </button>
+            </form>
+        </section>
+
+        {% if result %}
+        <section class="card">
+            <h2>Solution Summary</h2>
+            <div class="summary">
+                <div>
+                    <span class="summary-label">Status</span>
+                    <strong>{{ "Converged" if result.converged else "Not converged" }}</strong>
+                </div>
+                <div>
+                    <span class="summary-label">Estimated root</span>
+                    <strong>{{ "%.6g"|format(result.root if result.root is not none else float("nan")) }}</strong>
+                </div>
+                <div>
+                    <span class="summary-label">Final error</span>
+                    <strong>
+                        {% if result.final_error is not none %}
+                        {{ "%.6g"|format(result.final_error) }}
+                        {% else %}--{% endif %}
+                    </strong>
+                </div>
+                <div>
+                    <span class="summary-label">Iterations</span>
+                    <strong>{{ result.iterations | length }}</strong>
+                </div>
+            </div>
+            <p>{{ result.message }}</p>
+        </section>
+
+        {% if result.iterations %}
+        <section class="card">
+            <h2>Iteration Details</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            {% for column in result.columns %}
+                            <th>{{ column }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in result.iterations %}
+                        <tr>
+                            {% for column in result.columns %}
+                            <td>
+                                {% set value = row.get(column) %}
+                                {% if value is none %}
+                                --
+                                {% else %}
+                                {{ "%.6g"|format(value) if value == value else "--" }}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endif %}
+        {% endif %}
+    </main>
+
+    <script>
+        const methodSelect = document.getElementById("method");
+        const methodSections = document.querySelectorAll(".method-fields");
+
+        function toggleMethodFields() {
+            const selected = methodSelect.value;
+            methodSections.forEach((section) => {
+                const appliesTo = section.dataset.methods?.split(" ") || [];
+                if (appliesTo.includes(selected)) {
+                    section.classList.remove("hidden");
+                } else if (appliesTo.length === 0) {
+                    section.classList.remove("hidden");
+                } else {
+                    section.classList.add("hidden");
+                }
+            });
+        }
+
+        methodSelect.addEventListener("change", toggleMethodFields);
+        toggleMethodFields();
+        window.addEventListener("load", () => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+
+</html>
+
+
