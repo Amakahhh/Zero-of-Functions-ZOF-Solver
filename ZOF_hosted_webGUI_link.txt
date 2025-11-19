@@ -1,10 +1,5 @@
-Name: ______________________
-Matric Number: ______________________
-Hosted URL: https://________________________________
-GitHub Repository: https://github.com/________________________________
+Name: EJIKE CHIAMAKA SONNIA
+Matric Number: 22CG031853
+Hosted URL: https://ejike-zero-of-functions-zof-solver.onrender.com/
 
-Instructions:
-1. Replace the placeholders above once the Flask app is deployed (e.g., Render, PythonAnywhere, Streamlit Community Cloud, etc.).
-2. Confirm the hosted URL stays live until grading is complete.
-3. Ensure the GitHub repository matches the submission you upload to Scorac.
 
